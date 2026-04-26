@@ -78,3 +78,4 @@ jobs:
       body: "The production pipeline for the frontend has failed. Please check the GitHub Actions logs for details."
     secrets:
       BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+## Updated with GHCR in place of dockers
