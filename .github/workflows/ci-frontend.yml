@@ -1,0 +1,76 @@
+name: Frontend Production CI
+
+on:
+  push:
+    branches: 
+      - main 
+      - develop
+      - feature/frontend
+  pull_request:
+    branches: 
+      - main 
+      - develop
+      - feature/frontend
+
+jobs:
+  # 1. Build Check
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm install
+      - name: Build
+        run: npm run build
+
+  # 2. Code Quality (SonarQube)
+  sonarqube:
+    needs: build
+    uses: QuickHaulTransits/quickhaul-templates/.github/workflows/_sonarqube.yml@feature/templates
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+  # 3. Dependency Scan (Snyk)
+  snyk:
+    needs: sonarqube
+    uses: QuickHaulTransits/quickhaul-templates/.github/workflows/_snyk.yml@feature/templates
+    secrets:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+  # 4. Build & Push
+  docker:
+    needs: [sonarqube, snyk]
+    if: github.event_name == 'push'
+    uses: QuickHaulTransits/quickhaul-templates/.github/workflows/_docker-ci.yml@feature/templates
+    with:
+      image-name: quickhaul-frontend
+    secrets:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_TOKEN }}
+
+  # 5. Container Scan (Trivy)
+  trivy:
+    needs: docker
+    if: github.event_name == 'push'
+    uses: QuickHaulTransits/quickhaul-templates/.github/workflows/_trivy.yml@feature/templates
+    with:
+      image-name: quickhaul-frontend
+    secrets:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+
+  # 6. Failure Notification
+  notification:
+    needs: [sonarqube, snyk, docker, trivy]
+    if: failure()
+    uses: QuickHaulTransits/quickhaul-templates/.github/workflows/_notify.yml@feature/templates
+    with:
+      subject: "CI/CD Failure: Frontend"
+      body: "The production pipeline for the frontend has failed. Please check the GitHub Actions logs for details."
+    secrets:
+      BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
