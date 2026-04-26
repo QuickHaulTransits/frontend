@@ -80,5 +80,3 @@ jobs:
     secrets:
       BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
       ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
-
-//
