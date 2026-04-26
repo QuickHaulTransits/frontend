@@ -5,20 +5,32 @@ on:
     branches: 
       - main 
       - develop
-      - feature/frontend
+      - feature/ci-frontend
   pull_request:
     branches: 
       - main 
       - develop
-      - feature/frontend
+      - feature/ci-frontend
 
 permissions:
   contents: read
   packages: write
 
 jobs:
+  # 0. Initial Checkout & Sanity Check
+  checkout:
+    name: checkout / Verify Repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Files
+        run: |
+          ls -R
+          echo "✅ Repository access verified."
+
   # 1. Build Check
   build:
+    needs: checkout
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -71,7 +83,7 @@ jobs:
 
   # 6. Failure Notification
   notification:
-    needs: [sonarqube, snyk, ghcr, trivy]
+    needs: [checkout, build, sonarqube, snyk, ghcr, trivy]
     if: failure()
     uses: QuickHaulTransits/quickhaul-templates/.github/workflows/_notify.yml@feature/templates
     with:
