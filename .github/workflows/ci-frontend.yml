@@ -1,0 +1,94 @@
+name: Frontend Production CI
+
+on:
+  push:
+    branches: 
+      - main 
+      - develop
+      - feature/ci-frontend
+  pull_request:
+    branches: 
+      - main 
+      - develop
+      # - feature/ci-frontend
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  # 0. Initial Checkout & Sanity Check
+  checkout:
+    name: checkout / Verify Repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Files
+        run: |
+          ls -R
+          echo "✅ Repository access verified."
+
+  # 1. Build Check
+  build:
+    needs: checkout
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm install
+      - name: Build
+        run: npm run build
+
+  # 2. Code Quality (SonarQube)
+  sonarqube:
+    needs: build
+    uses: QuickHaulTransits/quickhaul-templates/.github/workflows/_sonarqube.yml@feature/templates
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+  # 3. Dependency Scan (Snyk)
+  snyk:
+    needs: sonarqube
+    uses: QuickHaulTransits/quickhaul-templates/.github/workflows/_snyk.yml@feature/templates
+    secrets:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+  # 4. Build & Push to GHCR
+  ghcr:
+    needs: [sonarqube, snyk]
+    if: github.event_name == 'push'
+    uses: QuickHaulTransits/quickhaul-templates/.github/workflows/_docker-ci.yml@feature/templates
+    with:
+      image-name: quickhaul-frontend
+    secrets:
+      DOCKER_USERNAME: ${{ github.actor }}
+      DOCKER_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+
+  # 5. Container Scan (Trivy)
+  trivy:
+    needs: ghcr
+    if: github.event_name == 'push'
+    uses: QuickHaulTransits/quickhaul-templates/.github/workflows/_trivy.yml@feature/templates
+    with:
+      image-name: quickhaul-frontend
+    secrets:
+      DOCKER_USERNAME: ${{ github.actor }}
+      DOCKER_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+
+  # 6. Failure Notification
+  notification:
+    needs: [checkout, build, sonarqube, snyk, ghcr, trivy]
+    if: failure()
+    uses: QuickHaulTransits/quickhaul-templates/.github/workflows/_notify.yml@feature/templates
+    with:
+      subject: "CI/CD Failure: Frontend"
+      body: "The production pipeline for the frontend has failed. Please check the GitHub Actions logs for details."
+    secrets:
+      BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+      ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
