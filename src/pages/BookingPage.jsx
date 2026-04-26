@@ -159,6 +159,7 @@ function BookingPage() {
     setLoadingStates(true);
     setError(""); // Clear previous errors
     try {
+      // Corrected path to /api/locations/states
       const response = await locationApi.get('/states');
       console.log('States loaded:', response.data);
       setStates(response.data);
@@ -168,7 +169,7 @@ function BookingPage() {
         console.log(`Retrying loadStates (${retryCount + 1}/2)...`);
         setTimeout(() => loadStates(retryCount + 1), 1000);
       } else {
-        setError('Failed to load states. Please refresh the page or check if backend services are running.');
+        setError('Failed to load states. Please check your internet or if backend services are running.');
       }
     } finally {
       setLoadingStates(false);
@@ -178,11 +179,11 @@ function BookingPage() {
   const loadDistricts = async (stateId, setter) => {
     setLoadingDistricts(true);
     try {
+      // Corrected path
       const response = await locationApi.get(`/districts?state=${stateId}`);
       setter(response.data);
     } catch (err) {
       console.error('Failed to load districts:', err);
-      setError('Failed to load districts. Please try again.');
     } finally {
       setLoadingDistricts(false);
     }
@@ -191,11 +192,11 @@ function BookingPage() {
   const loadCenters = async (districtId, setter, stateId) => {
     setLoadingCenters(true);
     try {
+      // Corrected path
       const response = await locationApi.get(`/centers?state=${stateId}&district=${districtId}`);
       setter(response.data);
     } catch (err) {
       console.error('Failed to load centers:', err);
-      setError('Failed to load centers. Please try again.');
     } finally {
       setLoadingCenters(false);
     }
